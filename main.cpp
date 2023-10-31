@@ -4,24 +4,30 @@
 extern "C" {
 #include "ftd2xx.h"
 };
+#define SIZE 256
 
 int main () {
     FT_HANDLE ftHandle;
     FT_STATUS ftStatus;
     DWORD BytesWritten;
-    char TxBuffer[256]; // содержит данные для записи в устройство
+    char TxBuffer[SIZE]; // содержит данные для записи в устройство
 
+    for (int i = 0; i < SIZE; i++) {
+        TxBuffer[i] = (char)i;
+    }
     ftStatus = FT_Open(0, &ftHandle);
     if(ftStatus != FT_OK)
     {
         printf("\nError FT_open\n");  // ошибка FT_Open
         return 0;
     }
-    ftStatus = FT_Write(ftHandle, TxBuffer, sizeof(TxBuffer), &BytesWritten);
-    if (ftStatus == FT_OK) {
-        printf("\nOK\n");// FT_Write OK
-    } else {
-        printf("\nFUCK\n");// ошибка FT_Write
+    for (;;) {
+        ftStatus = FT_Write(ftHandle, TxBuffer, sizeof(TxBuffer), &BytesWritten);
+        if (ftStatus == FT_OK) {
+            printf("\nOK\n");// FT_Write OK
+        } else {
+            printf("\nFUCK\n");// ошибка FT_Write
+        }
     }
     FT_Close(ftHandle);
     return 0;
