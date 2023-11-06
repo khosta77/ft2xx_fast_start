@@ -93,6 +93,19 @@ public:
 		bauderate = (buffer) ? br : bauderate;
 		return buffer;
 	}
+    
+    /** @brief setCharacteristics - задание характеристик передачи
+     *  @param wordlenght - количество бит на слово (фрейм) - тут должно быть значение FT_BITS_8 или FT_BITS_7
+     *  @param stopbit - количество стоп-бит - должно быть FT_STOP_BITS_1 или FT_STOP_BITS_2
+     *  @param parity - четность - должно быть FT_PARITY_NONE, FT_PARITY_ODD, FT_PARITY_EVEN, \
+     *                  FT_PARITY_MARK или FT_PARITY SPACE
+     * */
+    bool setCharacteristics(const UCHAR &wordlenght = FT_BITS_8,
+                            const UCHAR &stopbit = FT_STOP_BITS_1,
+                            const UCHAR &parity = FT_PARITY_NONE) {
+        ftStatus = FT_SetDataCharacteristics(ftHandle, FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE);
+        return ftStatusException(10);
+    }
 
 	bool writeData8(uint8_t *df, const size_t &size) {
         ftStatus = FT_Write(ftHandle, df, size, &BytesWritten);
