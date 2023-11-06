@@ -61,7 +61,12 @@ class uusart {
 			}
 			case 5: {
 				printf("---> Ошибка FT_CreateDeviceInfoList, не удалось определить количество подключенных устройств\n");
+                break;
 			}
+            case 6: {
+                printf("---> Ошибка FT_GetStatus, возникли траблы\n");
+                break;
+            }
 			default: {
 				printf("!!!> Ошибка в неизвестном методе: %d\n", module);
 			}
@@ -94,6 +99,20 @@ public:
 		return ftStatusException(2);
 	}
 
+    bool writeData16(uint16_t *df, const size_t &size) {
+		uint8_t buffer_array[(sizeof(uint16_t) * size)];
+		memcpy(buffer_array, df, (sizeof(uint16_t) * size));
+        ftStatus = FT_Write(ftHandle, &buffer_array[0], (sizeof(uint16_t) * size), &BytesWritten);
+		return ftStatusException(2);
+	}
+
+    bool writeData32(uint32_t *df, const size_t &size) {
+		uint8_t buffer_array[(sizeof(uint32_t) * size)];
+		memcpy(buffer_array, df, (sizeof(uint32_t) * size));
+        ftStatus = FT_Write(ftHandle, &buffer_array[0], (sizeof(uint32_t) * size), &BytesWritten);
+		return ftStatusException(2);
+	}
+
 	/** @brief readData8 - функция читает данные с устройства. В примере использования FT_Read были еще статусы \
 	 *					  какие-то и задержки, в общем они не работали
 	 *	@param df - массив, который считаем
@@ -106,13 +125,6 @@ public:
 		return ftStatusException(3);
 	}
 
-	bool writeData16(uint16_t *df, const size_t &size) {
-		uint8_t buffer_array[(sizeof(uint16_t) * size)];
-		memcpy(buffer_array, df, (sizeof(uint16_t) * size));
-        ftStatus = FT_Write(ftHandle, &buffer_array[0], (sizeof(uint16_t) * size), &BytesWritten);
-		return ftStatusException(2);
-	}
-
 	bool readData16(uint16_t *df, const size_t &size) {
 		uint8_t buffer_array[(sizeof(uint16_t) * size)];
 		bool buffer = false;
@@ -123,16 +135,74 @@ public:
 		return buffer;
 	}
 
-	bool writeData32(uint32_t *df, const size_t &size) {
-		uint8_t buffer_array[(sizeof(uint32_t) * size)];
-		memcpy(buffer_array, df, (sizeof(uint32_t) * size));
-        ftStatus = FT_Write(ftHandle, &buffer_array[0], (sizeof(uint32_t) * size), &BytesWritten);
-		return ftStatusException(2);
-	}
-
 	bool readData32(uint32_t *df, const size_t &size) {
 		uint8_t buffer_array[(sizeof(uint32_t) * size)];
 		bool buffer = false;
+		ftStatus = FT_Read(ftHandle, &buffer_array[0], (sizeof(uint32_t) * size), &BytesReceived);
+		buffer = ftStatusException(3);
+		if (buffer)
+			memcpy(df, buffer_array, (size * sizeof(uint32_t)));
+		return buffer;
+	}
+
+    bool readData8t(uint8_t *df, const size_t &size, const int &timewait) {
+		ftStatus = FT_SetTimeouts(ftHandle, timewait, 10);
+		ftStatus = FT_Read(ftHandle, df, size, &BytesReceived);
+		return ftStatusException(3);
+	}
+
+	bool readData16t(uint16_t *df, const size_t &size, const int &timewait) {
+		uint8_t buffer_array[(sizeof(uint16_t) * size)];
+		bool buffer = false;
+        ftStatus = FT_SetTimeouts(ftHandle, timewait, 0);
+		ftStatus = FT_Read(ftHandle, &buffer_array[0], (sizeof(uint16_t) * size), &BytesReceived);
+		buffer = ftStatusException(3);
+		if (buffer)
+			memcpy(df, buffer_array, (size * sizeof(uint16_t)));
+		return buffer;
+	}
+
+	bool readData32t(uint32_t *df, const size_t &size, const int &timewait) {
+		uint8_t buffer_array[(sizeof(uint32_t) * size)];
+		bool buffer = false;
+        ftStatus = FT_SetTimeouts(ftHandle, timewait, 0);
+		ftStatus = FT_Read(ftHandle, &buffer_array[0], (sizeof(uint32_t) * size), &BytesReceived);
+		buffer = ftStatusException(3);
+		if (buffer)
+			memcpy(df, buffer_array, (size * sizeof(uint32_t)));
+		return buffer;
+	}
+
+    bool readData8e(uint8_t *df, const size_t &size) {
+        do {
+            ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
+            if (!ftStatusException(6)) return false;
+        } while (RxBytes == 0);
+		ftStatus = FT_Read(ftHandle, df, size, &BytesReceived);
+		return ftStatusException(3);
+	}
+
+	bool readData16e(uint16_t *df, const size_t &size) {
+		uint8_t buffer_array[(sizeof(uint16_t) * size)];
+		bool buffer = false;
+        do {
+            ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
+            if (!ftStatusException(6)) return buffer;
+        } while (RxBytes == 0);
+        ftStatus = FT_Read(ftHandle, &buffer_array[0], (sizeof(uint16_t) * size), &BytesReceived);
+		buffer = ftStatusException(3);
+		if (buffer)
+			memcpy(df, buffer_array, (size * sizeof(uint16_t)));
+		return buffer;
+	}
+
+	bool readData32e(uint32_t *df, const size_t &size) {
+		uint8_t buffer_array[(sizeof(uint32_t) * size)];
+		bool buffer = false;
+        do {
+            ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
+            if (!ftStatusException(6)) return buffer;
+        } while (RxBytes == 0);
 		ftStatus = FT_Read(ftHandle, &buffer_array[0], (sizeof(uint32_t) * size), &BytesReceived);
 		buffer = ftStatusException(3);
 		if (buffer)
