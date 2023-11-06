@@ -7,7 +7,7 @@
 #include "usb_usart.h"
 
 #define MY_BDR 489
-#define SIZE 20
+#define SIZE 10
 
 void printa8 (uint8_t  *m, const size_t N);
 void printa16(uint16_t *m, const size_t N);
@@ -17,8 +17,8 @@ void randa16(uint16_t *m, const size_t N);
 void randa32(uint32_t *m, const size_t N);
 
 int main () {
- 	uint8_t *ptr_tx = new uint8_t[SIZE];
-	uint8_t *ptr_rx = new uint8_t[SIZE];
+ 	uint16_t *ptr_tx = new uint16_t[SIZE];
+	uint16_t *ptr_rx = new uint16_t[SIZE];
 	//randa8(ptr_tx, SIZE);
 
 	//printa8(ptr_tx, SIZE);
@@ -63,15 +63,15 @@ int main () {
 
 	//ch1.printDeviceInfo();
 	for (int i = 0; i < 50; i++) {
-	    ch1.writeData8e(ptr_tx, SIZE);
+	    ch1.writeData16e(ptr_tx, SIZE);
         for (int j = 0; j < SIZE; j++) {
-            ++ptr_tx[j]; 
+            ptr_tx[j] += 0x0101; 
         }
         printf("Отправка: ");
-	    printa8(ptr_tx, SIZE);
-	    ch1.readData8e(ptr_rx, SIZE);
+	    printa16(ptr_tx, SIZE);
+	    ch1.readData16e(ptr_rx, SIZE);
         printf("Прием:    ");
-	    printa8(ptr_rx, SIZE);
+	    printa16(ptr_rx, SIZE);
     }
 	delete []ptr_rx;
 	delete []ptr_tx;
@@ -91,7 +91,7 @@ void randa8(uint8_t *m, const size_t N) {
 
 void printa16(uint16_t *m, const size_t N) {
     for (size_t i = 0; i < N; i++)
-        printf("%3d", ((int)m[i]));
+        printf("%5d", ((int)m[i]));
 	std::cout << std::endl;
 }
 
@@ -102,7 +102,7 @@ void randa16(uint16_t *m, const size_t N) {
 
 void printa32(uint32_t *m, const size_t N) {
     for (size_t i = 0; i < N; i++)
-        printf("%3d", ((int)m[i]));
+        printf("%5d", ((int)m[i]));
 	std::cout << std::endl;
 }
 
