@@ -12,6 +12,7 @@ extern "C" {
 };
 
 class uusart {
+    // http://microsin.net/programming/pc/ftdi-d2xx-functions-api.html - ds
 	FT_HANDLE ftHandle;
 	FT_STATUS ftStatus;
 	DWORD EventDWord;
