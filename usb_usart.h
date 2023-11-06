@@ -113,6 +113,58 @@ public:
 		return ftStatusException(2);
 	}
 
+#if 0  // с врименной задержкой
+    bool writeData8(uint8_t *df, const size_t &size) {
+        ftStatus = FT_Write(ftHandle, df, size, &BytesWritten);
+		return ftStatusException(2);
+	}
+
+    bool writeData16(uint16_t *df, const size_t &size) {
+		uint8_t buffer_array[(sizeof(uint16_t) * size)];
+		memcpy(buffer_array, df, (sizeof(uint16_t) * size));
+        ftStatus = FT_Write(ftHandle, &buffer_array[0], (sizeof(uint16_t) * size), &BytesWritten);
+		return ftStatusException(2);
+	}
+
+    bool writeData32(uint32_t *df, const size_t &size) {
+		uint8_t buffer_array[(sizeof(uint32_t) * size)];
+		memcpy(buffer_array, df, (sizeof(uint32_t) * size));
+        ftStatus = FT_Write(ftHandle, &buffer_array[0], (sizeof(uint32_t) * size), &BytesWritten);
+		return ftStatusException(2);
+	}
+#endif
+
+    bool writeData8e(uint8_t *df, const size_t &size) {
+        do {
+            ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
+            if (!ftStatusException(6)) return false;
+        } while (TxBytes > 0);
+        ftStatus = FT_Write(ftHandle, df, size, &BytesWritten);
+		return ftStatusException(2);
+	}
+
+    bool writeData16e(uint16_t *df, const size_t &size) {
+		uint8_t buffer_array[(sizeof(uint16_t) * size)];
+        do {
+            ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
+            if (!ftStatusException(6)) return false;
+        } while (TxBytes > 0);
+		memcpy(buffer_array, df, (sizeof(uint16_t) * size));
+        ftStatus = FT_Write(ftHandle, &buffer_array[0], (sizeof(uint16_t) * size), &BytesWritten);
+		return ftStatusException(2);
+	}
+
+    bool writeData32e(uint32_t *df, const size_t &size) {
+		uint8_t buffer_array[(sizeof(uint32_t) * size)];
+        do {
+            ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
+            if (!ftStatusException(6)) return false;
+        } while (TxBytes > 0);
+		memcpy(buffer_array, df, (sizeof(uint32_t) * size));
+        ftStatus = FT_Write(ftHandle, &buffer_array[0], (sizeof(uint32_t) * size), &BytesWritten);
+		return ftStatusException(2);
+	}
+
 	/** @brief readData8 - функция читает данные с устройства. В примере использования FT_Read были еще статусы \
 	 *					  какие-то и задержки, в общем они не работали
 	 *	@param df - массив, который считаем
