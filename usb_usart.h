@@ -304,4 +304,35 @@ public:
 	}
 };
 
+#if 0
+    for (int i = 464; i < 500; i++) {
+        if (!ch1.setBaudRate(i))
+            continue;
+        const size_t sz = 1;
+        bool mrk = false;
+        for (size_t j = 0; j < sz; j++) {
+            ch1.writeData8(ptr_tx, SIZE);
+            printa8(ptr_tx, SIZE);
+            for (int i = 0; i < 100000; i++);
+            ch1.readData8(ptr_rx, SIZE);
+            printa8(ptr_rx, SIZE);
+            for (int k = 0; k < SIZE; k++) {
+                if ((ptr_tx[k] + 1) != (ptr_rx[k])) {
+                    printf("BDR: %4d ---> ERROR\n", i);
+                    mrk = true;
+                    break;
+                }
+            }
+            for (int k = 0; k < SIZE; k++)  ptr_tx[k] += 0x01;
+            if (mrk)
+                break;
+        }
+        if (!mrk)
+            printf("BDR: %4d ---> OK\n", i);
+    }
+    const UCHAR &wordlenght = FT_BITS_8,
+                            const UCHAR &stopbit = FT_STOP_BITS_1,
+                            const UCHAR &parity = FT_PARITY_NONE) {
+#endif
+
 #endif  // USB_USART_H_
