@@ -27,7 +27,7 @@ public:
     uint16_t *matrix;   /* Основной массив - он же матрица, т.к. двумерный */
 
 private:
-    uint16_t rgb565(const uint8_t &R, const uint8_t &G, const uint8_t &B) {
+    uint16_t rgb565(const uint16_t &R, const uint8_t &G, const uint8_t &B) {
         uint16_t total_color = (uint16_t)(((R & 0b11111000) << 8) | ((G & 0b11111100) << 3) | (B >> 3));
         //((B << 11) & 0xF800) | ((G << 5) & 0x07E0) | (R & 0x001F);
 	    total_color = ((total_color << 8) | (total_color >> 8));
