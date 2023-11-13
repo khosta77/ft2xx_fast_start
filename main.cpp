@@ -45,10 +45,10 @@ public:
         jpeg_stdio_src(&d1, f);
         jpeg_read_header(&d1, TRUE);
 
-        //rows = Y;
-        //cols = X;
-        rows = d1.image_height;
-        cols = d1.image_width;
+        rows = Y;
+        cols = X;
+        const size_t in_rows = d1.image_height;
+        const size_t in_cols = d1.image_width;
         matrix = new uint8_t[rows * cols * 3]{};
         //const size_t row_stride = d1.output_width * d1.output_components;
         
