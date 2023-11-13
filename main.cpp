@@ -24,8 +24,9 @@ public:
     size_t cols;      /* Колонки */
 
 public:
-    uint16_t *matrix;   /* Основной массив - он же матрица, т.к. двумерный */
+    uint8_t *matrix;   /* Основной массив - он же матрица, т.к. двумерный */
 
+#if 0
 private:
     uint16_t rgb565(const uint16_t &R, const uint8_t &G, const uint8_t &B) {
         uint16_t total_color = (uint16_t)(((R & 0b11111000) << 8) | ((G & 0b11111100) << 3) | (B >> 3));
@@ -33,9 +34,9 @@ private:
 	    total_color = ((total_color << 8) | (total_color >> 8));
         return total_color;
     }
-
+#endif
 public:
-    Mat(const std::string &filename) {
+    Mat(const std::string &filename, const size_t &X, const size_t &Y) {
         struct jpeg_decompress_struct d1;
         struct jpeg_error_mgr m1;
         d1.err = jpeg_std_error(&m1);
@@ -44,43 +45,119 @@ public:
         jpeg_stdio_src(&d1, f);
         jpeg_read_header(&d1, TRUE);
 
+        //rows = Y;
+        //cols = X;
         rows = d1.image_height;
         cols = d1.image_width;
-        matrix = new uint16_t[rows * cols]{};
-
+        matrix = new uint8_t[rows * cols * 3]{};
+        //const size_t row_stride = d1.output_width * d1.output_components;
+        
+        int buffer_height = 1;
+        size_t counter = 0;
         jpeg_start_decompress(&d1);
+        JSAMPARRAY buffer = (JSAMPARRAY)malloc(sizeof(JSAMPROW) * buffer_height);
+        buffer[0] = (JSAMPROW)malloc(sizeof(JSAMPLE) * d1.output_width * d1.output_components);
+        const size_t row_stride = d1.output_width * d1.output_components;
+        //img.resize(d1.image_height, d1.image_width, 3);
+        while (d1.output_scanline < d1.output_height) {
+            jpeg_read_scanlines(&d1, buffer, 1);
+            std::memcpy(this->matrix + counter, buffer[0], row_stride);
+            counter += row_stride;
+        }
+#if 0
         uint8_t *pBuf = new uint8_t[rows * cols * d1.num_components]{};
-        for (size_t i = 0; d1.output_scanline < d1.output_height;) {
+        size_t i = 0;
+        int buffer_height = 1;
+        size_t counter = 0;
+        JSAMPARRAY buffer = (JSAMPARRAY)malloc(sizeof(JSAMPROW) * buffer_height);
+        buffer[0] = (JSAMPROW)malloc(sizeof(JSAMPLE) * d1.output_width * d1.output_components);
+        while (d1.output_scanline < d1.output_height) {
             // Получить экранную строку
+            //jpeg_read_scanlines(&d1, buffer, 1);
+
             i += jpeg_read_scanlines(&d1, (JSAMPARRAY)&(pBuf), 1);
             for (size_t j = 0; j < cols; ++j) {
-                matrix[j + (i - 1) * cols] = rgb565(pBuf[j * d1.num_components + 2], 
-                                                    pBuf[j * d1.num_components + 1],
-                                                    pBuf[j * d1.num_components + 0]);
-            }
-        }
+               // matrix[j + (i - 1) * cols] = (uint8_t)(pBuf[j * d1.num_components]);
 
+            //std::memcpy(&matrix[counter], &buffer[0], row_stride);
+            //counter += row_stride;
+
+                //if (j < in_cols) {
+                    matrix[j * 3 + (i - 1) * cols + 2] = (uint8_t)(pBuf[j * 3 + 2]);
+                    matrix[j * 3 + (i - 1) * cols + 1] = (uint8_t)(pBuf[j * 3 + 1]);
+                    matrix[j * 3 + (i - 1) * cols + 0] = (uint8_t)(pBuf[j * 3 + 0]);
+                //} else {
+                  //  matrix[j + (i - 1) * cols + 2] = (uint8_t)(0x00);
+                   // matrix[j + (i - 1) * cols + 1] = (uint8_t)(0x00);
+                   // matrix[j + (i - 1) * cols + 0] = (uint8_t)(0x00);
+                }
+           // }
+        }
+        //for (; i < rows; ++i) {
+          //  for (size_t j = 0; j < cols; ++j) {
+            //    matrix[j + i * cols + 2] = (uint8_t)(0x00);
+              //  matrix[j + i * cols + 1] = (uint8_t)(0x00);
+             //   matrix[j + i * cols + 0] = (uint8_t)(0x00);
+           // }
+       // }
+#endif
         jpeg_finish_decompress(&d1);
         jpeg_destroy_decompress(&d1);
         fclose(f);
-        delete []pBuf;
+        //delete []pBuf;
     }
 
     ~Mat() {
         delete []matrix;
+    }
+
+    void save(const std::string &savename) {
+        struct jpeg_compress_struct cinfo;
+        struct jpeg_error_mgr jerr;
+        JSAMPROW row_pointer[1];
+        cinfo.err = jpeg_std_error(&jerr);
+        jpeg_create_compress(&cinfo);
+        FILE *outfile = fopen(savename.c_str(),"wb");
+        if (outfile == NULL) {
+            std::cout << "В класс JpegEncoder методу read не удалось открыть файл: " << savename << std::endl;
+            return;
+        }
+
+        jpeg_stdio_dest(&cinfo, outfile);
+        cinfo.image_width = cols;
+        cinfo.image_height = rows;
+        cinfo.input_components = 3;
+        cinfo.in_color_space = JCS_RGB;
+        JSAMPLE* image_buffer = new JSAMPLE[cinfo.image_width * cinfo.image_height * cinfo.input_components]();
+        for (size_t i = 0; i < cinfo.image_width * cinfo.image_height * cinfo.input_components; ++i) {
+            image_buffer[i] = this->matrix[i];
+        }
+
+        jpeg_set_defaults(&cinfo);
+        jpeg_set_quality(&cinfo, 100, true);
+        jpeg_start_compress(&cinfo, true);
+
+        while (cinfo.next_scanline < cinfo.image_height) {
+            row_pointer[0] = (JSAMPROW)&image_buffer[cinfo.next_scanline * cinfo.image_width * cinfo.input_components];
+            (void)jpeg_write_scanlines(&cinfo, row_pointer, 1);
+        }
+
+        jpeg_finish_compress(&cinfo);
+        jpeg_destroy_compress(&cinfo);
+        fclose(outfile);
     } 
 //------------------------------------------------------------------------------------------------------------
     // Basic operations
-    uint16_t& operator()(const size_t &i, const size_t &j) const {
+    uint8_t& operator()(const size_t &i, const size_t &j) const {
         return matrix[j + i * cols]; }
 
-    uint16_t& operator()(const size_t &i, const size_t &j) { return (uint16_t&)matrix[j + i * cols]; }
+    uint8_t& operator()(const size_t &i, const size_t &j) { return (uint8_t&)matrix[j + i * cols]; }
 
-    uint16_t& operator[](const size_t &k) { return matrix[k]; }
-    uint16_t& operator[](const size_t &k) const { return matrix[k]; }
+    uint8_t& operator[](const size_t &k) { return matrix[k]; }
+    uint8_t& operator[](const size_t &k) const { return matrix[k]; }
 };
 
-#define MY_BDR 489
+#define MY_BDR 9600//4803
 #define SIZE 10
 
 void randa8 (uint8_t  *m, const size_t N);
@@ -159,25 +236,28 @@ public:
     void print_image() {
         ptr_tx[0] = ptr_tx[1] = _cmd_print_h_line;
         ch.writeData8e(ptr_tx, 2);
-        Mat img("./test.jpg");
+        Mat img("./test.jpg", X, Y);
 
         for (size_t i = 0; i < img.rows; i++) {
             ch.readData8e(ptr_rx, 1);
             if (ptr_rx[0] == 0xFF)
-                ch.writeData16e(&img[(i * img.cols)], img.cols);
+                ch.writeData8e(&img[(i * img.cols)], (3 * img.cols));
             printf("send %3zu\n", i);
         }
     }
 };
 
 int main () {
-    ImageDisplay ph;
-    //ph.readDisplayInfo();
-    //ph.readDisplayRange();
-    ph.print_image();
+   Mat img("./test.jpg", 128, 160);
+   img.save("./test_test.jpg");
+   // ImageDisplay ph;
+   // printf("init()\n");
+   // ph.readDisplayInfo();
+   // ph.readDisplayRange();
+   // ph.print_image();
 #if 0
-    uint16_t *ptr_tx = new uint16_t[SIZE];
-	uint16_t *ptr_rx = new uint16_t[SIZE];
+    uint8_t *ptr_tx = new uint8_t[SIZE];
+	uint8_t *ptr_rx = new uint8_t[SIZE];
 	uusart ch1;
     ch1.setBaudRate(MY_BDR);
     ch1.setCharacteristics();
@@ -187,15 +267,15 @@ int main () {
 
 	//ch1.printDeviceInfo();
 	for (int i = 0; i < 50; i++) {
-	    ch1.writeData16e(ptr_tx, SIZE);
-        for (int j = 0; j < SIZE; j++) {
-            ptr_tx[j] += 0x0101; 
-        }
-        printf("Отправка: ");
-	    printa16(ptr_tx, SIZE);
-	    ch1.readData16e(ptr_rx, SIZE);
+	    //ch1.writeData8e(ptr_tx, SIZE);
+        //for (int j = 0; j < SIZE; j++) {
+          //  ptr_tx[j] += 0x0101; 
+        //}
+        //printf("Отправка: ");
+	    //printa16(ptr_tx, SIZE);
+	    ch1.readData8e(ptr_rx, SIZE);
         printf("Прием:    ");
-	    printa16(ptr_rx, SIZE);
+	    printa(ptr_rx, SIZE);
     }
 	delete []ptr_rx;
 	delete []ptr_tx;
