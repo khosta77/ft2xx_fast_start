@@ -66,6 +66,7 @@ public:
         jpeg_destroy_decompress(&d1);
         fclose(f);
         free(buffer);
+        std::reverse(matrix, matrix + (rows * cols * 3));
     }
 
     ~Mat() {
@@ -118,7 +119,7 @@ public:
     uint8_t& operator[](const size_t &k) const { return matrix[k]; }
 };
 
-#define MY_BDR 38400
+#define MY_BDR 2'000'000//921'600//460'829//230'946//153'846//115'200//38'400
 #define SIZE 10
 
 void randa8 (uint8_t  *m, const size_t N);
@@ -197,7 +198,7 @@ public:
     void print_image() {
         ptr_tx[0] = ptr_tx[1] = _cmd_print_h_line;
         ch.writeData8e(ptr_tx, 2);
-        Mat img("./test4.jpg", X, Y);
+        Mat img("./test2.jpg", X, Y);
 
         for (size_t i = 0; i < img.rows; i++) {
             ch.readData8e(ptr_rx, 1);
@@ -209,7 +210,7 @@ public:
 };
 
 int main () {
-   //Mat img("./test.jpg", 320, 480);
+   //Mat img("./test2.jpg", 320, 480);
    //img.save("./test_test.jpg");
     ImageDisplay ph;
     //ph.readDisplayInfo();
