@@ -57,11 +57,32 @@ public:
         JSAMPARRAY buffer = (JSAMPARRAY)malloc(sizeof(JSAMPROW) * buffer_height);
         buffer[0] = (JSAMPROW)malloc(sizeof(JSAMPLE) * d1.output_width * d1.output_components);
         const size_t row_stride = cols * 3;
-        while (d1.output_scanline < d1.output_height) {
-            jpeg_read_scanlines(&d1, buffer, 1);
-            for (size_t i = 0; i < row_stride; i++)
-                *(this->matrix + counter + i) = buffer[0][i];
-            counter += row_stride;
+        if ((in_rows <= rows) && (in_cols <= cols)) {
+            while (d1.output_scanline < d1.output_height) {
+                jpeg_read_scanlines(&d1, buffer, 1);
+                for (size_t i = 0; i < row_stride; i++)
+                    *(this->matrix + counter + i) = buffer[0][i];
+                counter += row_stride;
+            }
+        } else {
+            const double step_rows = (in_rows > rows) ? (in_rows / rows) : 1;
+            const double step_cols = (in_cols > cols) ? (in_cols / cols) : 1;
+            std::cout << step_rows << " " << step_cols << std::endl;
+            while (d1.output_scanline < d1.output_height) {
+                for (size_t i = 0; i < step_rows; i++)
+                    jpeg_read_scanlines(&d1, buffer, 1);
+                for (size_t i = 0, j = 0; i < row_stride; i+=3, j+=step_cols) {
+                    j = i * step_cols;
+                    if (j % 3 == 1)
+                        j += 2;
+                    else if (j % 3 == 2)
+                        j += 1;
+                    *(this->matrix + counter + i) = buffer[0][j];
+                    *(this->matrix + counter + i + 1) = buffer[0][j + 1];
+                    *(this->matrix + counter + i + 2) = buffer[0][j + 2];
+                }
+                counter += row_stride;
+            }
         }
         jpeg_finish_decompress(&d1);
         jpeg_destroy_decompress(&d1);
@@ -212,7 +233,7 @@ public:
     void print_image() {
         ptr_tx[0] = ptr_tx[1] = _cmd_print_h_line;
         ch.writeData8e(ptr_tx, 2);
-        std::string fn = "./test3.jpg";
+        std::string fn = "./test5.jpg";
         Mat img(fn, X, Y);
         std::cout << "Open: " << fn << std::endl;
         this->size = (3 * img.cols);
@@ -228,6 +249,8 @@ public:
 };
 
 int main () {
+    //Mat img("./test5.jpg", 320, 480);
+    //img.save("test5_test.jpg");
     ImageDisplay ph;
     ph.readDisplayInfo();
     ph.readDisplayRange();
