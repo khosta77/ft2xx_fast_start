@@ -59,7 +59,8 @@ public:
         const size_t row_stride = cols * 3;
         while (d1.output_scanline < d1.output_height) {
             jpeg_read_scanlines(&d1, buffer, 1);
-            std::memcpy(this->matrix + counter, buffer[0], row_stride);
+            for (size_t i = 0; i < row_stride; i++)
+                *(this->matrix + counter + i) = buffer[0][i];
             counter += row_stride;
         }
         jpeg_finish_decompress(&d1);
@@ -119,7 +120,7 @@ public:
     uint8_t& operator[](const size_t &k) const { return matrix[k]; }
 };
 
-#define MY_BDR 2'000'000//921'600//460'829//230'946//153'846//115'200//38'400
+#define MY_BDR 1'900'000
 #define SIZE 10
 
 void randa8 (uint8_t  *m, const size_t N);
@@ -152,6 +153,8 @@ class ImageDisplay {
     uint16_t X;
     uint16_t Y;
 
+    uint16_t size;
+
 public:
     ImageDisplay() {
         ptr_tx = new uint8_t[_size];
@@ -167,7 +170,7 @@ public:
     }
     
     void wait5s() {
-        usleep(3 * microsecond);//sleeps for 3 second
+        usleep(5 * microsecond);//sleeps for 3 second
     }
 
     void send(uint8_t cmd) {
@@ -195,68 +198,41 @@ public:
         printf("  Y: %d\n", Y);
     }
 
+private:
+    void mycopy(uint8_t *ptr1, uint8_t *ptr2, const size_t &size) {
+        for (size_t i = 0, j = (size - 3); i < size; i += 3, j -= 3) {
+            *(ptr1 + i) = *(ptr2 + j);
+            *(ptr1 + i + 1) = *(ptr2 + j + 1);
+            *(ptr1 + i + 2) = *(ptr2 + j + 2);
+        }
+    }
+
+public:
+
     void print_image() {
         ptr_tx[0] = ptr_tx[1] = _cmd_print_h_line;
         ch.writeData8e(ptr_tx, 2);
-        Mat img("./test2.jpg", X, Y);
-
+        std::string fn = "./test3.jpg";
+        Mat img(fn, X, Y);
+        std::cout << "Open: " << fn << std::endl;
+        this->size = (3 * img.cols);
+        uint8_t *ptr = new uint8_t[size];
         for (size_t i = 0; i < img.rows; i++) {
             ch.readData8e(ptr_rx, 1);
+            mycopy(ptr, &img[(i * (img.cols * 3))], size);
             if (ptr_rx[0] == 0xFF)
-                ch.writeData8e(&img[(i * (img.cols * 3))], (3 * img.cols));
+                ch.writeData8e(ptr, size);
             printf("send %3zu\n", i);
         }
     }
 };
 
 int main () {
-   //Mat img("./test2.jpg", 320, 480);
-   //img.save("./test_test.jpg");
     ImageDisplay ph;
-    //ph.readDisplayInfo();
+    ph.readDisplayInfo();
     ph.readDisplayRange();
     ph.print_image();
-#if 0
-    uint8_t *ptr_tx = new uint8_t[SIZE];
-	uint8_t *ptr_rx = new uint8_t[SIZE];
-	uusart ch1;
-    ch1.setBaudRate(MY_BDR);
-    ch1.setCharacteristics();
-//    ch1.setCharacteristics(FT_BITS_8, FT_STOP_BITS_2, FT_PARITY_NONE);
-    //ch1.writeData8(buffer, SIZE);
-	//ch1.readData8(buffer, SIZE);
-
-	//ch1.printDeviceInfo();
-	for (int i = 0; i < 50; i++) {
-	    //ch1.writeData8e(ptr_tx, SIZE);
-        //for (int j = 0; j < SIZE; j++) {
-          //  ptr_tx[j] += 0x0101; 
-        //}
-        //printf("Отправка: ");
-	    //printa16(ptr_tx, SIZE);
-	    ch1.readData8e(ptr_rx, SIZE);
-        printf("Прием:    ");
-	    printa(ptr_rx, SIZE);
-    }
-	delete []ptr_rx;
-	delete []ptr_tx;
-#endif
     return 0;
-}
-
-void randa8(uint8_t *m, const size_t N) {
-    for (size_t i = 0; i < N; i++)
-        m[i] = uint8_t(i + 1);
-}
-
-void randa16(uint16_t *m, const size_t N) {
-    for (size_t i = 0; i < N; i++)
-        m[i] = uint16_t(0x0FFF + i + 1);
-}
-
-void randa32(uint32_t *m, const size_t N) {
-    for (size_t i = 0; i < N; i++)
-        m[i] = uint32_t(0x0FFFFF + i + 1);
 }
 
 
