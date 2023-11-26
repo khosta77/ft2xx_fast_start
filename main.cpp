@@ -19,6 +19,12 @@ extern "C" {  // jpeglib.h
 #include <jpeglib.h>
 }
 
+uint16_t rgb565(const uint8_t &R, const uint8_t &G, const uint8_t &B) {
+    uint16_t rgb = ((R & 0b11111000) << 8) | ((G & 0b11111100) << 3) | (B >> 3);
+    return rgb;
+}
+
+
 class Mat {
 public:
     size_t rows;      /* Строки */
@@ -58,7 +64,11 @@ public:
         buffer[0] = (JSAMPROW)malloc(sizeof(JSAMPLE) * d1.output_width * d1.output_components);
         const size_t row_stride = cols * 3;
         if ((in_rows <= rows) && (in_cols <= cols)) {
-            while (d1.output_scanline < d1.output_height) {
+            for (size_t r = 0; d1.output_scanline < d1.output_height; ++r) {
+                if (r >= rows) {
+                    jpeg_read_scanlines(&d1, buffer, 1);
+                    continue;
+                }
                 jpeg_read_scanlines(&d1, buffer, 1);
                 for (size_t i = 0; i < row_stride; i++)
                     *(this->matrix + counter + i) = buffer[0][i];
@@ -68,7 +78,11 @@ public:
             const double step_rows = (in_rows > rows) ? (in_rows / rows) : 1;
             const double step_cols = (in_cols > cols) ? (in_cols / cols) : 1;
             std::cout << step_rows << " " << step_cols << std::endl;
-            while (d1.output_scanline < d1.output_height) {
+            for (size_t r = 0; d1.output_scanline < d1.output_height; ++r) {
+                if (r >= rows) {
+                    jpeg_read_scanlines(&d1, buffer, 1);
+                    continue;
+                }
                 for (size_t i = 0; i < step_rows; i++)
                     jpeg_read_scanlines(&d1, buffer, 1);
                 for (size_t i = 0, j = 0; i < row_stride; i+=3, j+=step_cols) {
@@ -88,7 +102,8 @@ public:
         jpeg_destroy_decompress(&d1);
         fclose(f);
         free(buffer);
-        std::reverse(matrix, matrix + (rows * cols * 3));
+        //std::reverse(matrix, matrix + (rows * cols * 3));
+        //printf("end read\n");
     }
 
     ~Mat() {
@@ -130,6 +145,7 @@ public:
         jpeg_destroy_compress(&cinfo);
         fclose(outfile);
     } 
+
 //------------------------------------------------------------------------------------------------------------
     // Basic operations
     uint8_t& operator()(const size_t &i, const size_t &j) const {
@@ -228,16 +244,26 @@ private:
         }
     }
 
+    void rgb888torgb565(uint8_t *ptr_old, uint8_t *ptr_new,const size_t &size) {
+        uint16_t color = 0;
+        for (size_t i = 0, j = 0, RGB888 = (3 * size); i < RGB888; i += 3, j += 2) {
+            color = rgb565(*(ptr_old + i), *(ptr_old + i + 1), *(ptr_old + i + 2));
+            *(ptr_new + j)     = (uint8_t)((color & 0xFF00) >> 8);
+            *(ptr_new + j + 1) = (uint8_t)((color & 0x00FF));
+        }
+    }
+    
+    const std::string fn = "./test4.jpg";
+
 public:
 
     void print_image() {
         ptr_tx[0] = ptr_tx[1] = _cmd_print_h_line;
         ch.writeData8e(ptr_tx, 2);
-        std::string fn = "./test5.jpg";
         Mat img(fn, X, Y);
-        std::cout << "Open: " << fn << std::endl;
         this->size = (3 * img.cols);
         uint8_t *ptr = new uint8_t[size];
+#if 0
         for (size_t i = 0; i < img.rows; i++) {
             ch.readData8e(ptr_rx, 1);
             mycopy(ptr, &img[(i * (img.cols * 3))], size);
@@ -245,13 +271,26 @@ public:
                 ch.writeData8e(ptr, size);
             printf("send %3zu\n", i);
         }
+#else
+        uint8_t *ptr565 = new uint8_t[(2 * img.cols)];
+        rgb888torgb565(ptr, ptr565, img.cols);
+        for (size_t i = 0; i < img.rows; i++) {
+            ch.readData8e(ptr_rx, 1);
+            mycopy(ptr, &img[(i * (img.cols * 3))], size); // С этой передачей надо играть
+            rgb888torgb565(ptr, ptr565, img.cols);
+            if (ptr_rx[0] == 0xFF)
+                ch.writeData8e(ptr565, (2 * img.cols));
+            printf("send %3zu\n", i);
+        }
+#endif
     }
 };
 
 int main () {
-    //Mat img("./test5.jpg", 320, 480);
+    //Mat img("./test2.jpg", 240, 320);
     //img.save("test5_test.jpg");
     ImageDisplay ph;
+    printf("Init ImageDisplay\n");
     ph.readDisplayInfo();
     ph.readDisplayRange();
     ph.print_image();
