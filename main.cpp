@@ -8,7 +8,7 @@
 #include<unistd.h>
 #include <algorithm>
 #include <iterator>
-#include "usb_usart.h"
+#include "./ftd2xxlib/usb_usart.h"
 
 extern "C" {  // jpeglib.h
 #include <stdio.h>
@@ -19,29 +19,15 @@ extern "C" {  // jpeglib.h
 #include <jpeglib.h>
 }
 
-uint16_t rgb565(const uint8_t &R, const uint8_t &G, const uint8_t &B) {
-    uint16_t rgb = ((R & 0b11111000) << 8) | ((G & 0b11111100) << 3) | (B >> 3);
-    return rgb;
+inline uint16_t rgb565(const uint8_t &R, const uint8_t &G, const uint8_t &B) {
+    return (uint16_t)((R & 0b11111000) << 8) | ((G & 0b11111100) << 3) | (B >> 3);
 }
 
-
 class Mat {
-public:
-    size_t rows;      /* Строки */
-    size_t cols;      /* Колонки */
+    size_t _rows;
+    size_t _cols;
+    uint8_t *matrix;
 
-public:
-    uint8_t *matrix;   /* Основной массив - он же матрица, т.к. двумерный */
-
-#if 0
-private:
-    uint16_t rgb565(const uint16_t &R, const uint8_t &G, const uint8_t &B) {
-        uint16_t total_color = (uint16_t)(((R & 0b11111000) << 8) | ((G & 0b11111100) << 3) | (B >> 3));
-        //((B << 11) & 0xF800) | ((G << 5) & 0x07E0) | (R & 0x001F);
-	    total_color = ((total_color << 8) | (total_color >> 8));
-        return total_color;
-    }
-#endif
 public:
     Mat(const std::string &filename, const size_t &X, const size_t &Y) {
         struct jpeg_decompress_struct d1;
@@ -52,20 +38,20 @@ public:
         jpeg_stdio_src(&d1, f);
         jpeg_read_header(&d1, TRUE);
 
-        rows = Y;
-        cols = X;
+        _rows = Y;
+        _cols = X;
         const size_t in_rows = d1.image_height;
         const size_t in_cols = d1.image_width;
-        matrix = new uint8_t[rows * cols * 3]{}; 
+        matrix = new uint8_t[_rows * _cols * 3]{}; 
         int buffer_height = 1;
         size_t counter = 0;
         jpeg_start_decompress(&d1);
         JSAMPARRAY buffer = (JSAMPARRAY)malloc(sizeof(JSAMPROW) * buffer_height);
         buffer[0] = (JSAMPROW)malloc(sizeof(JSAMPLE) * d1.output_width * d1.output_components);
-        const size_t row_stride = cols * 3;
-        if ((in_rows <= rows) && (in_cols <= cols)) {
+        const size_t row_stride = _cols * 3;
+        if ((in_rows <= _rows) && (in_cols <= _cols)) {
             for (size_t r = 0; d1.output_scanline < d1.output_height; ++r) {
-                if (r >= rows) {
+                if (r >= _rows) {
                     jpeg_read_scanlines(&d1, buffer, 1);
                     continue;
                 }
@@ -75,11 +61,10 @@ public:
                 counter += row_stride;
             }
         } else {
-            const double step_rows = (in_rows > rows) ? (in_rows / rows) : 1;
-            const double step_cols = (in_cols > cols) ? (in_cols / cols) : 1;
-            std::cout << step_rows << " " << step_cols << std::endl;
+            const double step_rows = (in_rows > _rows) ? (in_rows / _rows) : 1;
+            const double step_cols = (in_cols > _cols) ? (in_cols / _cols) : 1;
             for (size_t r = 0; d1.output_scanline < d1.output_height; ++r) {
-                if (r >= rows) {
+                if (r >= _rows) {
                     jpeg_read_scanlines(&d1, buffer, 1);
                     continue;
                 }
@@ -102,13 +87,11 @@ public:
         jpeg_destroy_decompress(&d1);
         fclose(f);
         free(buffer);
-        //std::reverse(matrix, matrix + (rows * cols * 3));
+        std::reverse(matrix, matrix + (_rows * _cols * 3));
         //printf("end read\n");
     }
 
-    ~Mat() {
-        delete []matrix;
-    }
+    ~Mat() { delete []matrix; }
 
     void save(const std::string &savename) {
         struct jpeg_compress_struct cinfo;
@@ -123,8 +106,8 @@ public:
         }
 
         jpeg_stdio_dest(&cinfo, outfile);
-        cinfo.image_width = cols;
-        cinfo.image_height = rows;
+        cinfo.image_width = _cols;
+        cinfo.image_height = _rows;
         cinfo.input_components = 3;
         cinfo.in_color_space = JCS_RGB;
         JSAMPLE* image_buffer = new JSAMPLE[cinfo.image_width * cinfo.image_height * cinfo.input_components]();
@@ -148,13 +131,14 @@ public:
 
 //------------------------------------------------------------------------------------------------------------
     // Basic operations
-    uint8_t& operator()(const size_t &i, const size_t &j) const {
-        return matrix[j + i * cols]; }
-
-    uint8_t& operator()(const size_t &i, const size_t &j) { return (uint8_t&)matrix[j + i * cols]; }
+    uint8_t& operator()(const size_t &i, const size_t &j) const { return matrix[j + i * _cols]; }
+    uint8_t& operator()(const size_t &i, const size_t &j) { return (uint8_t&)matrix[j + i * _cols]; }
 
     uint8_t& operator[](const size_t &k) { return matrix[k]; }
     uint8_t& operator[](const size_t &k) const { return matrix[k]; }
+
+	inline size_t rows() const noexcept { return _rows; }
+	inline size_t cols() const noexcept { return _cols; }
 };
 
 #define MY_BDR 1'900'000
@@ -206,10 +190,6 @@ public:
 
     }
     
-    void wait5s() {
-        usleep(5 * microsecond);//sleeps for 3 second
-    }
-
     void send(uint8_t cmd) {
         ptr_tx[0] = ptr_tx[1] = cmd;
         ch.writeData8(ptr_tx, 2);
@@ -253,7 +233,7 @@ private:
         }
     }
     
-    const std::string fn = "./test4.jpg";
+    const std::string fn = "./test_img/ILI9488_test_320x480.jpeg";
 
 public:
 
@@ -261,25 +241,25 @@ public:
         ptr_tx[0] = ptr_tx[1] = _cmd_print_h_line;
         ch.writeData8e(ptr_tx, 2);
         Mat img(fn, X, Y);
-        this->size = (3 * img.cols);
+        this->size = (3 * img.cols());
         uint8_t *ptr = new uint8_t[size];
-#if 0
-        for (size_t i = 0; i < img.rows; i++) {
+#if 1  // Перевод в RGB666
+        for (size_t i = 0; i < img.rows(); i++) {
             ch.readData8e(ptr_rx, 1);
-            mycopy(ptr, &img[(i * (img.cols * 3))], size);
+            mycopy(ptr, &img[(i * (img.cols() * 3))], size);
             if (ptr_rx[0] == 0xFF)
                 ch.writeData8e(ptr, size);
             printf("send %3zu\n", i);
         }
-#else
-        uint8_t *ptr565 = new uint8_t[(2 * img.cols)];
-        rgb888torgb565(ptr, ptr565, img.cols);
-        for (size_t i = 0; i < img.rows; i++) {
+#else  // Перевод в RGB565
+        uint8_t *ptr565 = new uint8_t[(2 * img.cols())];
+        rgb888torgb565(ptr, ptr565, img.cols());
+        for (size_t i = 0; i < img.rows(); i++) {
             ch.readData8e(ptr_rx, 1);
-            mycopy(ptr, &img[(i * (img.cols * 3))], size); // С этой передачей надо играть
-            rgb888torgb565(ptr, ptr565, img.cols);
+            mycopy(ptr, &img[(i * (img.cols() * 3))], size); // С этой передачей надо играть
+            rgb888torgb565(ptr, ptr565, img.cols());
             if (ptr_rx[0] == 0xFF)
-                ch.writeData8e(ptr565, (2 * img.cols));
+                ch.writeData8e(ptr565, (2 * img.cols()));
             printf("send %3zu\n", i);
         }
 #endif
@@ -287,8 +267,6 @@ public:
 };
 
 int main () {
-    //Mat img("./test2.jpg", 240, 320);
-    //img.save("test5_test.jpg");
     ImageDisplay ph;
     printf("Init ImageDisplay\n");
     ph.readDisplayInfo();
